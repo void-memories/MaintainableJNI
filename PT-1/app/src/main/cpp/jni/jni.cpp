@@ -10,6 +10,19 @@ extern std::string buildJsonFromRestaurant(JNIEnv *env, RestaurantShadow &restSh
 
 JavaVM *globalJvm = nullptr;
 
+// Kotlin Function declaration (without Java_ prefix)
+jstring serializeRestaurant(JNIEnv *env, jobject thiz, jobject jRestaurant) {
+    RestaurantShadow restShadow(env, jRestaurant);
+    std::string json = buildJsonFromRestaurant(env, restShadow);
+    return env->NewStringUTF(json.c_str());
+}
+
+// Init functions, called only once!!!
+static const JNINativeMethod nativeMethods[] = {
+        {"serializeRestaurant", "(Lcom/voidmemories/restaurant_serializer/Restaurant;)Ljava/lang/String;",
+         (void *)serializeRestaurant}
+};
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void * /*reserved*/) {
     globalJvm = vm;
 
@@ -18,21 +31,19 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void * /*reserved*/) {
         return -1;
     }
 
-    // Initialize shadows
     AddressShadow::init(env);
     MenuItemShadow::init(env);
     OpeningHourShadow::init(env);
     RestaurantShadow::init(env);
 
-    return JNI_VERSION_1_6;
-}
+    jclass clazz = env->FindClass("com/voidmemories/restaurant_serializer/ExternalFunctions");
+    if (!clazz) {
+        return -1;
+    }
 
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_voidmemories_restaurant_1serializer_ExternalFunctions_serializeRestaurant(JNIEnv *env,
-                                                                                   jobject thiz,
-                                                                                   jobject jRestaurant) {
-    RestaurantShadow restShadow(env, jRestaurant);
-    std::string json = buildJsonFromRestaurant(env, restShadow);
-    return env->NewStringUTF(json.c_str());
+    if (env->RegisterNatives(clazz, nativeMethods, sizeof(nativeMethods) / sizeof(nativeMethods[0])) != JNI_OK) {
+        return -1;
+    }
+
+    return JNI_VERSION_1_6;
 }
